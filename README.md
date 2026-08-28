@@ -1,6 +1,8 @@
+[![Build and Test](https://github.com/sonertari/SSLproxy/actions/workflows/ci.yml/badge.svg)](https://github.com/sonertari/SSLproxy/actions/workflows/ci.yml)
+
 # SSLproxy - transparent SSL/TLS proxy for decrypting and diverting network traffic to other programs for deep SSL inspection
 
-Copyright (C) 2017-2025, [Soner Tari](mailto:sonertari@gmail.com).
+Copyright (C) 2017-2026, [Soner Tari](mailto:sonertari@gmail.com).
 https://github.com/sonertari/SSLproxy
 
 Copyright (C) 2009-2019, [Daniel Roethlisberger](//daniel.roe.ch/).
@@ -132,6 +134,7 @@ connection options too:
 
 	    RemoveHTTPAcceptEncoding (yes|no)
 	    RemoveHTTPReferer (yes|no)
+	    StripClientHello (yes|no)
 	    MaxHTTPHeaderSize 8192
 	    ValidateProto (yes|no)
 
@@ -459,6 +462,7 @@ connection options too:
 
 	    RemoveHTTPAcceptEncoding (yes|no)
 	    RemoveHTTPReferer (yes|no)
+	    StripClientHello (yes|no)
 	    MaxHTTPHeaderSize 8192
 	    ValidateProto (yes|no)
 

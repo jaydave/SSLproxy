@@ -3,7 +3,7 @@
  * https://www.roe.ch/SSLsplit
  *
  * Copyright (c) 2009-2019, Daniel Roethlisberger <daniel@roe.ch>.
- * Copyright (c) 2017-2025, Soner Tari <sonertari@gmail.com>.
+ * Copyright (c) 2017-2026, Soner Tari <sonertari@gmail.com>.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -615,6 +615,14 @@ pxy_prepare_logging_local_procinfo(pxy_conn_ctx_t *ctx)
 }
 #endif /* HAVE_LOCAL_PROCINFO */
 
+static int check_fd_usage(
+#ifdef DEBUG_PROXY
+	pxy_conn_ctx_t *ctx
+#else
+	void
+#endif /* DEBUG_PROXY */
+);
+
 static int
 pxy_prepare_logging(pxy_conn_ctx_t *ctx)
 {
@@ -627,6 +635,16 @@ pxy_prepare_logging(pxy_conn_ctx_t *ctx)
 	}
 #endif /* HAVE_LOCAL_PROCINFO */
 	if (WANT_CONTENT_LOG(ctx)) {
+		if (check_fd_usage(
+#ifdef DEBUG_PROXY
+				ctx
+#endif /* DEBUG_PROXY */
+				) == -1) {
+				ctx->enomem = 1;
+				pxy_conn_term(ctx, 1);
+				return -1;
+		}
+
 		if (log_content_open(&ctx->logctx, ctx->global,
 							 (struct sockaddr *)&ctx->srcaddr,
 							 ctx->srcaddrlen,
@@ -1305,6 +1323,20 @@ pxy_bev_readcb_preexec_logging_and_stats(struct bufferevent *bev, pxy_conn_ctx_t
 		}
 
 		if (WANT_CONTENT_LOG(ctx->conn)) {
+                        if (ctx->conn_opts->stripclienthello && ctx->proto == PROTO_AUTOSSL && bev == ctx->src.bev) {
+                                if (protoautossl_is_searching(ctx)) {
+                                        size_t inbuf_len = evbuffer_get_length(inbuf);
+                                        size_t pullup_len = inbuf_len > 4096 ? 4096 : inbuf_len;
+                                        unsigned char *data = evbuffer_pullup(inbuf, pullup_len);
+                                        if (data) {
+                                                const unsigned char *chello = NULL;
+                                                int rv = ssl_tls_clienthello_parse(data, pullup_len, 0, &chello, NULL);
+                                                if (rv == 0 || (rv == 1 && chello != NULL)) {
+                                                        return 0;
+                                                }
+                                        }
+                                }
+                        }
 			// HTTP content logging at this point may record certain header lines twice, if we have not seen all headers yet
 			return pxy_log_content_inbuf(ctx, inbuf, (bev == ctx->src.bev));
 		}
@@ -1353,6 +1385,20 @@ pxy_bev_readcb_preexec_logging_and_stats_child(struct bufferevent *bev, pxy_conn
 	}
 
 	if (WANT_CONTENT_LOG(ctx->conn)) {
+                if (ctx->conn->conn_opts->stripclienthello && ctx->conn->proto == PROTO_AUTOSSL && bev == ctx->src.bev) {
+                        if (protoautossl_is_searching(ctx->conn)) {
+                                size_t inbuf_len = evbuffer_get_length(inbuf);
+                                size_t pullup_len = inbuf_len > 4096 ? 4096 : inbuf_len;
+                                unsigned char *data = evbuffer_pullup(inbuf, pullup_len);
+                                if (data) {
+                                        const unsigned char *chello = NULL;
+                                        int rv = ssl_tls_clienthello_parse(data, pullup_len, 0, &chello, NULL);
+                                        if (rv == 0 || (rv == 1 && chello != NULL)) {
+                                                return 0;
+                                        }
+                                }
+                        }
+                }
 		return pxy_log_content_inbuf(ctx->conn, inbuf, (bev == ctx->src.bev));
 	}
 	return 0;
@@ -1423,11 +1469,11 @@ pxy_bev_writecb_child(struct bufferevent *bev, void *arg)
 	}
 }
 
-static int NONNULL(1,3)
+static void NONNULL(1,3)
 pxy_bev_eventcb_postexec_logging_and_stats(struct bufferevent *bev, short events, pxy_conn_ctx_t *ctx)
 {
 	if (ctx->term || ctx->enomem) {
-		return -1;
+		return;
 	}
 
 	if (events & BEV_EVENT_CONNECTED) {
@@ -1438,7 +1484,7 @@ pxy_bev_eventcb_postexec_logging_and_stats(struct bufferevent *bev, short events
 				pxy_log_connect_src(ctx);
 			} else if (ctx->connected) {
 				if (pxy_prepare_logging(ctx) == -1) {
-					return -1;
+					return;
 				}
 				// Doesn't log connect if proto is http, http proto does its own connect logging
 				pxy_log_connect_srvdst(ctx);
@@ -1460,7 +1506,6 @@ pxy_bev_eventcb_postexec_logging_and_stats(struct bufferevent *bev, short events
 			}
 		}
 	}
-	return 0;
 }
 
 /*

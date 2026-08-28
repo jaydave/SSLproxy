@@ -3,7 +3,7 @@
  * https://www.roe.ch/SSLsplit
  *
  * Copyright (c) 2009-2019, Daniel Roethlisberger <daniel@roe.ch>.
- * Copyright (c) 2017-2025, Soner Tari <sonertari@gmail.com>.
+ * Copyright (c) 2017-2026, Soner Tari <sonertari@gmail.com>.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -34,5 +34,7 @@
 
 protocol_t protoautossl_setup(pxy_conn_ctx_t *) NONNULL(1);
 protocol_t protoautossl_setup_child(pxy_conn_child_ctx_t *) NONNULL(1);
+
+int protoautossl_is_searching(pxy_conn_ctx_t *) NONNULL(1);
 
 #endif /* PROTOAUTOSSL_H */
